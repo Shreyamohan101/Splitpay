@@ -1,7 +1,10 @@
 const express = require('express');
 const connectDB = require("./config/db.js");
 const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");  
+const userRoutes = require("./routes/userRoutes"); 
+const billRoutes = require("./routes/billRoutes"); 
+
+
 require('dotenv').config();
 
 const app = express();
@@ -21,6 +24,8 @@ connectDB()
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes); 
+app.use("/api/bills", billRoutes); 
+
 
 app.get("/", (req, res) => {
     res.send("SplitPay API is running...");
