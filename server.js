@@ -3,12 +3,23 @@ const connectDB = require("./config/db.js");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes"); 
 const billRoutes = require("./routes/billRoutes"); 
+const routerlogger = require("express-list-endpoints");
+const protect = require('./middlewares/authMiddleware.js');
 
 
 require('dotenv').config();
 
 const app = express();
 app.use(express.json()); 
+
+app.use("/api/auth", authRoutes);
+app.use("/api/users", protect, userRoutes); 
+app.use("/api/bills", protect, billRoutes); 
+
+
+app.get("/", (req, res) => {
+    res.send("SplitPay API is running...");
+});
 
 connectDB()
   .then(() => {
@@ -21,12 +32,4 @@ connectDB()
       console.error("Error occurred while connecting:", err);
   });
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes); 
-app.use("/api/bills", billRoutes); 
-
-
-app.get("/", (req, res) => {
-    res.send("SplitPay API is running...");
-});
+  console.log(routerlogger(app));

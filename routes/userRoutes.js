@@ -7,6 +7,6 @@ const protect = require("../middlewares/authMiddleware.js");
 const router = express.Router();
 
 // Protected route - Only logged-in users can access
-router.get("/profile", protect, getUserProfile);
+router.get("/profile", getUserProfile);
 
 module.exports = router;
