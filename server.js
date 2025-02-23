@@ -5,6 +5,7 @@ const userRoutes = require("./routes/userRoutes");
 const billRoutes = require("./routes/billRoutes"); 
 const routerlogger = require("express-list-endpoints");
 const protect = require('./middlewares/authMiddleware.js');
+const expenseRoutes = require("./routes/expenseRoutes");
 
 
 require('dotenv').config();
@@ -15,8 +16,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/users", protect, userRoutes); 
 app.use("/api/bills", protect, billRoutes); 
-
-
+app.use("/api/expenses", expenseRoutes); 
 app.get("/", (req, res) => {
     res.send("SplitPay API is running...");
 });
