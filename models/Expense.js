@@ -8,7 +8,7 @@ const expenseSchema = new mongoose.Schema({
     {
       user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       amount: { type: Number, required: true },
-      paid: { type: Boolean, default: false }, // NEW FIELD TO TRACK PAYMENT
+      paid: { type: Boolean, default: false }, 
     },
   ],
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

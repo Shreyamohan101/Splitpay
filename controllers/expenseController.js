@@ -1,95 +1,75 @@
 const Expense = require("../models/Expense");
+const User = require("../models/userModel");
+const QRCode = require("qrcode");
+const twilio = require("twilio");
 
-// Function to add an expense
+// Twilio Config
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioClient = twilio(accountSid, authToken);
+const twilioWhatsAppNumber = "whatsapp:+14155238886"; // Twilio sandbox number
+
+// Add Expense Controller with WhatsApp + QR Code
 const addExpense = async (req, res) => {
     try {
-        const { title, amount, participants } = req.body;
-        const paidBy = req.user._id; // The authenticated user who is paying
-
-        if (!title || !amount || participants.length === 0) {
+        const { title, amount, participants, paidBy } = req.body;
+        
+        if (!title || !amount || !participants || !paidBy) {
             return res.status(400).json({ message: "All fields are required" });
         }
 
-        // Calculate each participant's share
-        const splitAmount = amount / participants.length;
-        const shares = participants.map(userId => ({ user: userId, amount: splitAmount, paid: false }));
-
-        // Saving the expense
-        const expense = new Expense({ title, amount, participants, shares, paidBy, settled: false });
-        await expense.save();
-
-        return res.status(201).json({ message: "Expense added successfully", expense });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal Server Error" });
-    }
-};
-
-// Function to get all expenses of the authenticated user
-const getExpenses = async (req, res) => {
-    try {
-        // Fetching all expenses where the user is involved
-        const expenses = await Expense.find({
-            $or: [
-                { paidBy: req.user._id }, 
-                { participants: req.user._id }
-            ]
+        // Expense Creation
+        const newExpense = new Expense({
+            title,
+            amount,
+            participants,
+            paidBy,
+            shares: participants.map(user => ({
+                user,
+                amount: amount / participants.length, // Equal split
+                paid: false
+            }))
         });
 
-        if (expenses.length === 0) {
-            return res.status(404).json({ message: "No expenses found" });
+        await newExpense.save();
+
+        // Fetch Payer Details
+        const payer = await User.findById(paidBy);
+        if (!payer) {
+            return res.status(404).json({ message: "Payer not found" });
         }
 
-        return res.status(200).json({ message: "Expenses retrieved successfully", expenses });
+        // Fetch Participants Details (Phone Numbers)
+        const participantUsers = await User.find({ _id: { $in: participants } });
+
+        // WhatsApp Notifications
+        for (const participant of participantUsers) {
+            if (!participant.phone) continue; // Skip if phone is missing
+
+            const amountOwed = (amount / participants.length).toFixed(2);
+            const qrData = `upi://pay?pa=${payer.phone}@upi&pn=${payer.name}&mc=0000&tid=123456&tr=SplitPay_${newExpense._id}&tn=${title}&am=${amountOwed}&cu=INR`;
+
+            // Generate QR Code
+            const qrCodeUrl = await QRCode.toDataURL(qrData);
+
+            // WhatsApp Message
+            const message = `Hey *${participant.name}*, you owe *₹${amountOwed}* for *${title}*.  
+🔹 Scan this QR to pay: [QR Image](${qrCodeUrl})  
+🔹 Or confirm payment here: [Click to Mark Paid](http://yourfrontend.com/settle/${newExpense._id})`;
+
+            await twilioClient.messages.create({
+                from: twilioWhatsAppNumber,
+                to: `whatsapp:+91${participant.phone}`,
+                body: message
+            });
+        }
+
+        res.status(201).json({ message: "Expense added & WhatsApp notifications sent", expense: newExpense });
+
     } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal Server Error" });
+        console.error("Error adding expense:", error);
+        res.status(500).json({ message: "Internal Server Error" });
     }
 };
 
-// Function to settle an expense
-const settleExpense = async (req, res) => {
-    try {
-        const { expenseId } = req.params;
-        const { userId } = req.body; // User who is settling
-
-        // Find the expense
-        const expense = await Expense.findById(expenseId);
-        if (!expense) {
-            return res.status(404).json({ message: "Expense not found" });
-        }
-
-        // Find the user's share in the expense
-        const share = expense.shares.find((s) => s.user.toString() === userId);
-
-        if (!share) {
-            return res.status(400).json({ message: "User not part of this expense" });
-        }
-
-        if (share.paid) {
-            return res.status(400).json({ message: "Already settled" });
-        }
-
-        // Mark this user's share as paid
-        share.paid = true;
-
-        // Check if all participants have paid
-        const allPaid = expense.shares.every((s) => s.paid);
-        if (allPaid) {
-            expense.settled = true;
-        }
-
-        // Save updated expense
-        await expense.save();
-
-        return res.json({
-            message: allPaid ? "Expense fully settled" : "Payment recorded",
-            expense,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
-module.exports = { addExpense, getExpenses, settleExpense };
+module.exports = { addExpense };
