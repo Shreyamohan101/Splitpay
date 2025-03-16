@@ -1,70 +1,65 @@
+const QRCode = require("qrcode");
 const Expense = require("../models/Expense");
 const User = require("../models/userModel");
-const QRCode = require("qrcode");
-const twilio = require("twilio");
 
-// Twilio Config
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioClient = twilio(accountSid, authToken);
-const twilioWhatsAppNumber = "whatsapp:+14155238886"; // Twilio sandbox number
+const { connectToWhatsApp, sendWhatsAppMessage } = require("../services/whatsapp");
 
-// Add Expense Controller with WhatsApp + QR Code
 const addExpense = async (req, res) => {
     try {
-        const { title, amount, participants, paidBy } = req.body;
-        
-        if (!title || !amount || !participants || !paidBy) {
+        const { title, amount, participants, paidBy, payerUpiId } = req.body;
+
+        if (!title || !amount || !participants || !paidBy || !payerUpiId) {
             return res.status(400).json({ message: "All fields are required" });
         }
 
-        // Expense Creation
+        const payer = await User.findById(paidBy);
+        if (!payer || !payer.phone) {
+            return res.status(404).json({ message: "Payer not found or phone number missing" });
+        }
+
+    
+
         const newExpense = new Expense({
             title,
             amount,
             participants,
             paidBy,
+            payerUpiId,
             shares: participants.map(user => ({
                 user,
-                amount: amount / participants.length, // Equal split
+                amount: amount / participants.length,
                 paid: false
             }))
         });
 
         await newExpense.save();
 
-        // Fetch Payer Details
-        const payer = await User.findById(paidBy);
-        if (!payer) {
-            return res.status(404).json({ message: "Payer not found" });
-        }
-
-        // Fetch Participants Details (Phone Numbers)
         const participantUsers = await User.find({ _id: { $in: participants } });
 
-        // WhatsApp Notifications
+        //  send whatsapp messages only if whatsApp is linked>>
         for (const participant of participantUsers) {
-            if (!participant.phone) continue; // Skip if phone is missing
+            if (!participant.phone || participant._id.toString() === paidBy) continue; // Skip payer
 
             const amountOwed = (amount / participants.length).toFixed(2);
-            const qrData = `upi://pay?pa=${payer.phone}@upi&pn=${payer.name}&mc=0000&tid=123456&tr=SplitPay_${newExpense._id}&tn=${title}&am=${amountOwed}&cu=INR`;
+            const upiUrl = `upi://pay?pa=${payerUpiId}&pn=${payer.name}&am=${amountOwed}&cu=INR&tn=${title}`;
+            const qrCodeData = await QRCode.toDataURL(upiUrl);
 
-            // Generate QR Code
-            const qrCodeUrl = await QRCode.toDataURL(qrData);
+            const message = ` *SplitPay Expense here* \n\n` +
+                `Heya *${participant.name}*, you owe *₹${amountOwed}* for *${title}*.\n\n` +
+                `🔹 *Payer:* ${payer.name} (${payer.phone})\n` +
+                `🔹 *Amount:* ₹${amountOwed}\n\n` +
+                `📲 *Scan & Pay:* [Click Here](${upiUrl})\n\n` +
+                `✔️ *After paying, mark it here:* [Settle Bill](http://yourfrontend.com/settle/${newExpense._id})`;
 
-            // WhatsApp Message
-            const message = `Hey *${participant.name}*, you owe *₹${amountOwed}* for *${title}*.  
-🔹 Scan this QR to pay: [QR Image](${qrCodeUrl})  
-🔹 Or confirm payment here: [Click to Mark Paid](http://yourfrontend.com/settle/${newExpense._id})`;
-
-            await twilioClient.messages.create({
-                from: twilioWhatsAppNumber,
-                to: `whatsapp:+91${participant.phone}`,
-                body: message
-            });
+            // send wtsp message using payer linked account
+            await sendWhatsAppMessage(participant.phone, message);
+            await sendWhatsAppMessage(participant.phone, { image: { url: qrCodeData }, caption: "Scan & Pay via UPI!" });
         }
 
-        res.status(201).json({ message: "Expense added & WhatsApp notifications sent", expense: newExpense });
+        res.status(201).json({
+            message: "Expense added & WhatsApp notifications sent from Payer's WhatsApp",
+            expense: newExpense
+        });
 
     } catch (error) {
         console.error("Error adding expense:", error);
@@ -72,4 +67,45 @@ const addExpense = async (req, res) => {
     }
 };
 
-module.exports = { addExpense };
+
+//  Get all expenses
+const getExpenses = async (req, res) => {
+    try {
+        const expenses = await Expense.find()
+            .populate("participants", "name phone")
+            .populate("paidBy", "name phone");
+
+        res.status(200).json(expenses);
+    } catch (error) {
+        console.error(" Error fetching expenses:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+//  Settle an expense
+const settleExpense = async (req, res) => {
+    try {
+        const { expenseId } = req.params;
+        const { userId } = req.body;
+
+        const expense = await Expense.findById(expenseId);
+        if (!expense) {
+            return res.status(404).json({ message: "Expense not found" });
+        }
+
+        const share = expense.shares.find(share => share.user.toString() === userId);
+        if (!share) {
+            return res.status(400).json({ message: "User not part of this expense" });
+        }
+
+        share.paid = true;
+        await expense.save();
+
+        res.status(200).json({ message: "Expense settled successfully", expense });
+    } catch (error) {
+        console.error(" Error settling expense:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+module.exports = { addExpense, getExpenses, settleExpense };

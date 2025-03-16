@@ -5,8 +5,8 @@ const protect = require("../middlewares/authMiddleware");
 const router = express.Router();
 
 // Protected routes
-router.post("/", protect, createBill); // Create a bill
-router.get("/", protect, getUserBills); // Get user’s bills
-router.put("/:id/pay", protect, markBillAsPaid); // Mark a bill as paid
+router.post("/", protect, createBill); 
+router.get("/", protect, getUserBills); 
+router.put("/:id/pay", protect, markBillAsPaid); 
 
 module.exports = router;
