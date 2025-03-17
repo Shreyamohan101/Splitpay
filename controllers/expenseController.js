@@ -38,7 +38,7 @@ const addExpense = async (req, res) => {
 
         //  send whatsapp messages only if whatsApp is linked....still needs to be refined>
         for (const participant of participantUsers) {
-            if (!participant.phone || participant._id.toString() === paidBy) continue; // Skip payer
+            if (!participant.phone || participant._id.toString() === paidBy) continue; //not for payer
 
             const amountOwed = (amount / participants.length).toFixed(2);
             const upiUrl = `upi://pay?pa=${payerUpiId}&pn=${payer.name}&am=${amountOwed}&cu=INR&tn=${title}`;
