@@ -12,7 +12,6 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
-// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/bills", billRoutes);
@@ -22,7 +21,7 @@ app.get("/", (req, res) => {
     res.send("SplitPay API is running...");
 });
 
-// Connect to Database & Start Server
+
 connectDB()
     .then(() => {
         console.log(" Connected to MongoDB successfully");
@@ -31,7 +30,7 @@ connectDB()
             console.log(" Server is running on port 4000");
         });
 
-        //  wtsp connection with Auto-Retry
+        //  wtsp connection with Auto-retry
         async function connectWhatsAppWithRetry(retries = 3, delay = 5000) {
             for (let i = 0; i < retries; i++) {
                 try {

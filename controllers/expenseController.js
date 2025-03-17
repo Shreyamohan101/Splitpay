@@ -36,7 +36,7 @@ const addExpense = async (req, res) => {
 
         const participantUsers = await User.find({ _id: { $in: participants } });
 
-        //  send whatsapp messages only if whatsApp is linked>>
+        //  send whatsapp messages only if whatsApp is linked....still needs to be refined>
         for (const participant of participantUsers) {
             if (!participant.phone || participant._id.toString() === paidBy) continue; // Skip payer
 
@@ -68,7 +68,7 @@ const addExpense = async (req, res) => {
 };
 
 
-//  Get all expenses
+//get all expenses *
 const getExpenses = async (req, res) => {
     try {
         const expenses = await Expense.find()

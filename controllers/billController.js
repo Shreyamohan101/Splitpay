@@ -1,21 +1,20 @@
 const Bill = require("../models/billModel");
 
-// Create a new bill
+// create a new bill
 const createBill = async (req, res) => {
     try {
         const { title, amount, participants } = req.body;
 
-        // Validate required fields
         if (!title || !amount || !participants || participants.length === 0) {
             return res.status(400).json({ message: "All fields are required" });
         }
 
-        // Ensure amount is a positive number
+//amount +ve
         if (amount <= 0) {
             return res.status(400).json({ message: "Amount must be greater than zero" });
         }
 
-        // Ensure participants is an array
+        // participants is an array
         if (!Array.isArray(participants)) {
             return res.status(400).json({ message: "Participants should be an array" });
         }
@@ -33,7 +32,7 @@ const createBill = async (req, res) => {
     }
 };
 
-// Get bills where the user is involved
+//get bills where the user is involved
 const getUserBills = async (req, res) => {
     try {
         const bills = await Bill.find({
