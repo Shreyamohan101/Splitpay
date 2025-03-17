@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 
 const signup = async (req, res) => {
     try {
-        console.log("Received Body:", req.body);  // Debugging
+        console.log("Received Body:", req.body);  //debugging
 
         const { name, email, phone, password, upiId } = req.body;
 
